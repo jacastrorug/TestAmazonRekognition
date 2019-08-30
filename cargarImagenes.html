@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Upload images</title>
+        
+        <link rel="stylesheet" href="assets/css/styles.css" />
+        
+    </head>
+    
+    <body>
+    
+    <div id="dropbox">
+      <span class="message">Drop images here to upload. <br /><i>(they will only be visible to you)</i></span>
+    </div>
+
+
+    <script src="dist/aws-sdk.js"></script>
+    <script src="dist/aws-sdk.min.js"></script>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.16.0.min.js"></script>
+
+    <script type="text/javascript">
+
+      AWS.config.region = 'us-west-2'; // Region
+      AWS.config.credentials = new AWS.Credentials('AKIAJUGW3WWDQ72BOY2A', '9OieAsykGMyVXeLkdx5ZevzTCTcHxTjdgxFVK9fo');
+      const rekognition = new AWS.Rekognition();
+
+      function listCollections(){
+        rekognition.listCollections({}, function(err, data){
+          console.log(data);
+        });
+      }
+
+      function listFaces(codList){
+        let paramsListFaces = {
+          CollectionId: codList
+        };
+
+        rekognition.listFaces(paramsListFaces, function (err, data) {
+          console.log(data);
+        });
+        
+      }
+
+    </script>
+        
+
+    <script src="http://code.jquery.com/jquery-1.6.3.min.js"></script>
+
+    <script src="assets/js/jquery.filedrop.js"></script>
+
+    <script src="assets/js/script.js"></script>
+
+
+    </body>
+
+</html>
+

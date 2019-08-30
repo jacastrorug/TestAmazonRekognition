@@ -1,0 +1,70 @@
+<!DOCTYPE HTML>
+<html lang="en-US">
+<head>
+	<meta charset="UTF-8">
+	<title></title>
+
+	<script type="text/javascript" src="opencv_haarcascade_frontalface_alt.js"></script>
+	<script type="text/javascript" src="opencv_haarcascade_eye.js"></script>
+	<script type="text/javascript" src="opencv_haarcascade_upper_body.js"></script>
+	<script type="text/javascript" src="opencv_haarcascade_mouth.js"></script>
+</head>
+<body>
+	<script>
+
+		var toFloat = function(v) {
+			return parseFloat(v);
+		},
+
+		toInt = function(v) {
+			return parseInt(v, 10);
+		},
+
+		convert = function(haarcascade) {
+			var stages = [],
+				hstages = haarcascade.stages,
+				i,
+				j;
+
+			for (i = 0; i < hstages.length; i++) {
+				var stage = [],
+					trees = [],
+					hstage = hstages[i],
+					htrees = hstage.trees,
+					parent = toInt(hstage.parent),
+					stageThreshold = toFloat(hstage.stage_threshold);
+
+				for (j = 0; j < htrees.length; j++) {
+					var node = [],
+						hnode = htrees[j][0],
+						hnodeThreshold = toFloat(hnode.threshold),
+						hnodeLeft = toFloat(hnode.left_val),
+						hnodeRight = toFloat(hnode.right_val),
+						hnodeRects = hnode.feature.rects,
+						hr,
+						r;
+
+						for (r = 0; r < hnodeRects.length; r++) {
+							hr = hnodeRects[r].split(" ").map(toFloat),
+							node = node.concat(hr);
+						}
+
+						node.push(hnodeThreshold, hnodeLeft, hnodeRight);
+						trees.push(node);
+				}
+
+				stage.push(parent, stageThreshold, trees);
+				stages.push(stage);
+			}
+
+			console.log(stages);
+
+			return JSON.stringify(stages);
+		};
+
+		var json = convert(opencv_haarcascade_mouth);
+
+		console.log(json);
+	</script>
+</body>
+</html>

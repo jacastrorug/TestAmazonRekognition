@@ -1,0 +1,259 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Reconocimiento Facial</title>
+    <link rel="stylesheet" href="assets/demo.css">
+
+    <script src="dist/aws-sdk.js"></script>
+    <script src="dist/aws-sdk.min.js"></script>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.16.0.min.js"></script>
+
+
+    <script src="build/tracking-min.js"></script>
+    <script src="build/data/face-min.js"></script>
+
+    <script src="dat.gui.min.js"></script>
+    <script src="stats.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+    <style>
+        video, canvas {
+            margin-left: 230px;
+            margin-top: 120px;
+            position: absolute;
+        }
+    </style>
+
+</head>
+<body>
+<div class="demo-frame">
+    <div class="demo-container">
+        <div style="width: 50%;float: left;">
+            <canvas id="snapshot" width="520" height="390" hidden="true"></canvas>
+            <video id="video" width="520" height="390" preload autoplay loop muted></video>
+            <canvas id="canvas" width="520" height="390"></canvas>
+        </div>
+        <div style="width: 50%; float: right;">
+            <img width="520" id="image-change" src="imagenesPrueba/generic_avatar_300.gif">
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+    window.onload = function () {
+
+        let paramsCollection = {
+            CollectionId: 'prueba2'
+        };
+
+        let correctos = 0,
+            incorrectos = 0,
+            errores = 0,
+            flag = false,
+            tiempos = [],
+            intentos = 0;
+
+        AWS.config.region = 'us-east-1'; // Region
+        AWS.config.credentials = new AWS.Credentials('AKIAJUGW3WWDQ72BOY2A', '9OieAsykGMyVXeLkdx5ZevzTCTcHxTjdgxFVK9fo');
+        let rekognition = new AWS.Rekognition();
+
+        /*
+       //Create collection
+       rekognition.createCollection(paramsCollection, function(err, data){
+             console.log(err, data);
+       });
+       */
+
+
+        /*
+        //Delete collection
+        rekognition.deleteCollection(paramsCollection, function(err, data){
+              console.log(err,data);
+        });
+        */
+
+
+        rekognition.listCollections({}, function (err, data) {
+            console.log(data);
+        });
+
+        let paramsListFaces = {
+            CollectionId: 'prueba2'
+        };
+
+        rekognition.listFaces(paramsListFaces, function (err, data) {
+            console.log(data);
+        });
+
+        /*
+        rekognition.describeCollection(paramsCollection, function(err, data) {
+        	if (err) 
+        		console.log(err, err.stack); 
+        	else     console.log(data);
+        });
+        /*
+        rekognition.describeCollection(paramsCollection, function(err, data){
+        	console.log(data);
+        });
+        */
+
+        let video = document.getElementById('video');
+        let canvas = document.getElementById('canvas');
+        let canvasSnapshot = document.getElementById('snapshot');
+        let context = canvas.getContext('2d');
+        let contextSnapshot = canvasSnapshot.getContext('2d');
+        let tracker = new tracking.ObjectTracker('face');
+
+
+        tracker.setInitialScale(4);
+        tracker.setStepSize(2);
+        tracker.setEdgesDensity(0.1);
+
+        let cara = document.getElementById('image-change');
+        let trackerTask = tracking.track('#video', tracker, {camera: true});
+
+        tracker.on('track', function (event) {
+            let actual = performance.now();
+            if (intentos === 0) {
+                tiempos[intentos] = {intento: intentos, tiempo: actual, diferencia: 0}
+            } else {
+                tiempos[intentos] = {
+                    intento: intentos,
+                    tiempo: actual,
+                    diferencia: actual - tiempos[intentos - 1].tiempo
+                }
+            }
+
+            intentos++;
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            event.data.forEach(function (rect) {
+
+                context.strokeStyle = '#303a3f';
+                context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+                context.font = '11px Helvetica';
+                context.fillStyle = '#303a3f';
+                context.fillText('x: ' + rect.x + 'px', rect.x + rect.width + 5, rect.y + 11);
+                context.fillText('y: ' + rect.y + 'px', rect.x + rect.width + 5, rect.y + 22);
+
+                //SNAPSHOT
+                contextSnapshot.drawImage(video, 0, 0, 520, 390, 0, 0, 520, 390);
+//                contextSnapshot.drawImage(video, 100, 100, 300, 300, 0, 0, 300, 300);
+                //console.log(performance.now() - t0);
+                let dataUrl = canvasSnapshot.toDataURL('image/jpeg');
+                let base64Image = dataUrl.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
+                //console.log(dataUrl);
+                let imageBytes = getBinary(base64Image);
+
+                let paramsImgCompare = {
+                    CollectionId: 'prueba2',
+                    FaceMatchThreshold: 95,
+                    Image: {
+                        Bytes: imageBytes
+                    },
+                    MaxFaces: 1
+                };
+
+                if (!flag) {
+                    flag = true;
+                    trackerTask.stop();
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+
+                    let inicio = performance.now();
+                    console.log("Enviando Cara " + intentos);
+                    rekognition.searchFacesByImage(paramsImgCompare, function (err, data) {
+                        if (err) {
+                            console.log(err, err.stack);
+                            errores++;
+                            flag = false;
+                            trackerTask.run();
+                        } else {
+                            let faces = data.FaceMatches;
+
+                            if (faces.length > 0) {
+                                let tiempoEjecucion = performance.now() - inicio;
+
+                                flag = true;
+                                for (let i = 0; i < faces.length; i++) {
+                                    let face = faces[i].Face;
+                                    cara.src = 'imagenesPrueba/' + face.ExternalImageId;
+                                }
+
+                                correctos++;
+                                console.log("Correctos " + correctos + "  tiempo " + (performance.now() - tiempos[0].tiempo));
+
+
+                                if (deb) {
+
+                                    let suma = 0;
+                                    let cant = tiempos.length;
+
+                                    for (i = 0; i < cant; i++) {
+                                        suma += tiempos[i].diferencia;
+                                    }
+
+                                    console.log("%c Milliseconds: " + tiempoEjecucion, "color: #2FA1D6; font-size: 15px");
+                                    console.log("%c Promedio: " + (cant ? (suma / cant) : cant), "color: #2FA1D6; font-size: 15px");
+
+                                    console.log("%c Correctos: " + correctos, "color: #37CA5A; font-size: 15px");
+                                    console.log("%c Incorrectos: " + incorrectos, "color: #CA3737; font-size: 15px");
+                                    console.log("%c Errores: " + errores, "color: #9CB20A; font-size: 15px");
+
+
+                                    console.log(faces[faces.length - 1].Face);
+                                    console.table(tiempos);
+                                }
+
+                                setTimeout(function () {
+                                    flag = false;
+                                    trackerTask.run();
+                                    correctos = 0;
+                                    incorrectos = 0;
+                                    errores = 0;
+                                    tiempos = [];
+                                    intentos = 0;
+                                }, 2000);
+
+                            } else {
+                                incorrectos++;
+                                flag = false;
+                                trackerTask.run();
+                            }
+                        }
+                    });
+                }
+            });
+
+
+            if (event.data.length == 0) {
+                //console.log('Sin cara');
+                $('#image-change').attr('src', ('imagenesPrueba/generic_avatar_300.gif'));
+            }
+        });
+
+        let gui = new dat.GUI();
+        gui.add(tracker, 'edgesDensity', 0.1, 0.5).step(0.01);
+        gui.add(tracker, 'initialScale', 1.0, 10.0).step(0.1);
+        gui.add(tracker, 'stepSize', 1, 5).step(0.1);
+
+
+        function getBinary(base64Image) {
+            let binaryImg = atob(base64Image);
+            let length = binaryImg.length;
+            let ab = new ArrayBuffer(length);
+            let ua = new Uint8Array(ab);
+            for (let i = 0; i < length; i++) {
+                ua[i] = binaryImg.charCodeAt(i);
+            }
+            return ab;
+        }
+
+
+    };
+</script>
+
+</body>
+</html>
